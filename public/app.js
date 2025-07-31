@@ -28,6 +28,11 @@ class VoiceChatApp {
         this.volumeValue = document.getElementById('volume-value');
         this.messages = document.getElementById('messages');
         this.webrtcBtn = document.getElementById('webrtc-btn');
+        
+        // Variables pour matchmaking
+        this.currentPartner = null;
+        this.userState = null;
+        this.isInConversation = false;
     }
 
     setupEventListeners() {
@@ -69,9 +74,13 @@ class VoiceChatApp {
         // Empêcher la sélection du texte sur le bouton
         this.recordBtn.addEventListener('selectstart', (e) => e.preventDefault());
 
-        // Bouton WebRTC
+        // Bouton WebRTC (maintenant bouton "Utilisateur suivant")
         this.webrtcBtn.addEventListener('click', () => {
-            this.startWebRTCCall();
+            if (this.isInConversation) {
+                this.nextUser();
+            } else {
+                this.startWebRTCCall();
+            }
         });
     }
 
@@ -93,23 +102,52 @@ class VoiceChatApp {
             this.recordBtn.disabled = true;
         });
 
-        this.socket.on('users-count', (count) => {
-            this.usersCount.textContent = `${count} utilisateur(s) connecté(s)`;
+        // État du matchmaking
+        this.socket.on('matchmaking-state', (state) => {
+            this.userState = state;
+            this.updateMatchmakingUI();
+        });
+
+        // Statistiques du matchmaking
+        this.socket.on('matchmaking-stats', (stats) => {
+            this.updateStats(stats);
+        });
+
+        // Match trouvé
+        this.socket.on('match-found', (data) => {
+            console.log('🎯 Match trouvé avec:', data.partner.id);
+            this.currentPartner = data.partner;
+            this.isInConversation = true;
             
-            if (count >= 2) {
-                this.readyStatus.textContent = 'Prêt à discuter !';
-                this.addSystemMessage('Vous pouvez maintenant discuter avec votre correspondant');
-                
-                // Initialiser WebRTC quand 2 utilisateurs sont connectés
-                this.initializeWebRTC();
-                
-                // Afficher le bouton WebRTC
-                if (this.webrtcBtn) {
-                    this.webrtcBtn.style.display = 'flex';
-                }
-            } else {
-                this.readyStatus.textContent = 'En attente d\'un autre utilisateur...';
+            this.addSystemMessage('🎉 Partenaire trouvé ! WebRTC activé automatiquement');
+            this.recordBtn.disabled = false;
+            
+            if (this.webrtcBtn) {
+                this.webrtcBtn.style.display = 'none'; // WebRTC auto
             }
+
+            // Démarrer automatiquement WebRTC
+            setTimeout(() => {
+                this.initializeAndStartWebRTC();
+            }, 1000);
+        });
+
+        // Match terminé
+        this.socket.on('match-ended', (data) => {
+            console.log('💔 Match terminé:', data.reason);
+            
+            let message = 'Conversation terminée';
+            switch (data.reason) {
+                case 'partner_left':
+                    message = 'Votre partenaire a quitté';
+                    break;
+                case 'partner_next':
+                    message = 'Votre partenaire passe au suivant';
+                    break;
+            }
+            
+            this.addSystemMessage(message, 'warning');
+            this.resetConversation();
         });
 
         this.socket.on('audio-data', (audioData) => {
@@ -258,6 +296,84 @@ class VoiceChatApp {
         }
     }
 
+    async initializeAndStartWebRTC() {
+        this.initializeWebRTC();
+        if (this.webrtcManager) {
+            try {
+                await this.webrtcManager.startWebRTCCall();
+                this.addSystemMessage('🌐 WebRTC activé automatiquement');
+            } catch (error) {
+                console.error('❌ Échec WebRTC automatique:', error);
+                this.addSystemMessage('WebRTC indisponible, utilisation Socket.IO', 'warning');
+            }
+        }
+    }
+
+    nextUser() {
+        if (!this.isInConversation) return;
+        
+        console.log('🔄 Demande utilisateur suivant');
+        this.addSystemMessage('Recherche d\'un nouveau partenaire...', 'info');
+        
+        // Nettoyer WebRTC
+        if (this.webrtcManager) {
+            this.webrtcManager.disconnect();
+            this.webrtcManager = null;
+        }
+        
+        // Envoyer la demande au serveur
+        this.socket.emit('next-user');
+        
+        this.resetConversation();
+    }
+
+    resetConversation() {
+        this.isInConversation = false;
+        this.currentPartner = null;
+        this.recordBtn.disabled = true;
+        
+        if (this.webrtcBtn) {
+            this.webrtcBtn.innerHTML = '<span class="webrtc-icon">🔄</span><span>Recherche...</span>';
+            this.webrtcBtn.disabled = true;
+        }
+    }
+
+    updateMatchmakingUI() {
+        if (!this.userState) return;
+        
+        const user = this.userState.user;
+        const stats = this.userState.stats;
+        const queuePos = this.userState.queuePosition;
+        
+        // Mise à jour du statut
+        switch (user.status) {
+            case 'available':
+                this.readyStatus.textContent = 'Recherche d\'un partenaire...';
+                break;
+            case 'in_queue':
+                this.readyStatus.textContent = `En file d'attente (position ${queuePos})`;
+                break;
+            case 'in_conversation':
+                this.readyStatus.textContent = 'En conversation';
+                if (this.webrtcBtn) {
+                    this.webrtcBtn.innerHTML = '<span class="webrtc-icon">⏭️</span><span>Utilisateur suivant</span>';
+                    this.webrtcBtn.disabled = false;
+                    this.webrtcBtn.style.display = 'flex';
+                }
+                break;
+        }
+        
+        // Mise à jour des statistiques
+        this.updateStats(stats);
+    }
+
+    updateStats(stats) {
+        if (this.usersCount) {
+            this.usersCount.textContent = 
+                `${stats.totalUsers} en ligne • ${stats.activeConversations} conversations • ${stats.usersInQueue} en attente`;
+        }
+    }
+
     async startWebRTCCall() {
         if (this.webrtcManager) {
             try {
@@ -285,7 +401,7 @@ class VoiceChatApp {
     }
 
     async startRecording() {
-        if (!this.isConnected || this.isRecording) return;
+        if (!this.isConnected || this.isRecording || !this.isInConversation) return;
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 

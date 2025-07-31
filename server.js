@@ -92,7 +92,7 @@ function notifyMatch(user1Id, user2Id, conversation) {
     state: user2State
   });
   
-  console.log(\`🎯 Match créé: \${user1Id} ↔ \${user2Id}\`);
+  console.log(`🎯 Match créé: ${user1Id} ↔ ${user2Id}`);
 }
 
 function notifyMatchEnd(userId, reason) {
@@ -205,7 +205,7 @@ io.on('connection', (socket) => {
 
   // Passer à l'utilisateur suivant
   socket.on('next-user', () => {
-    console.log(\`🔄 \${socket.id} demande l'utilisateur suivant\`);
+    console.log(`🔄 ${socket.id} demande l'utilisateur suivant`);
     
     const currentPartner = matchmaking.getPartner(socket.id);
     if (currentPartner) {
@@ -277,8 +277,8 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(\`🚀 Serveur de matchmaking démarré sur \${HOST}:\${PORT}\`);
-  console.log(\`📱 Accès local: http://localhost:\${PORT}\`);
+  console.log(`🚀 Serveur de matchmaking démarré sur ${HOST}:${PORT}`);
+  console.log(`📱 Accès local: http://localhost:${PORT}`);
   
   // Afficher les adresses IP disponibles
   const networkInterfaces = require('os').networkInterfaces();
@@ -287,7 +287,7 @@ server.listen(PORT, HOST, () => {
   Object.keys(networkInterfaces).forEach(interfaceName => {
     networkInterfaces[interfaceName].forEach(iface => {
       if (iface.family === 'IPv4' && !iface.internal) {
-        console.log(\`   \${interfaceName}: http://\${iface.address}:\${PORT}\`);
+        console.log(`   ${interfaceName}: http://${iface.address}:${PORT}`);
       }
     });
   });
