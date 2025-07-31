@@ -71,6 +71,26 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  console.log(`Serveur démarré sur ${HOST}:${PORT}`);
+  console.log(`Accès local: http://localhost:${PORT}`);
+  
+  // Afficher les adresses IP disponibles
+  const networkInterfaces = require('os').networkInterfaces();
+  console.log('\n📡 Accès réseau disponibles:');
+  
+  Object.keys(networkInterfaces).forEach(interfaceName => {
+    networkInterfaces[interfaceName].forEach(iface => {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        console.log(`   ${interfaceName}: http://${iface.address}:${PORT}`);
+      }
+    });
+  });
+  
+  console.log('\n💡 Pour accéder depuis un autre appareil:');
+  console.log('   1. Connectez-vous au même réseau WiFi');
+  console.log('   2. Utilisez une des adresses IP ci-dessus');
+  console.log('   3. Ou configurez le port forwarding pour l\'accès externe');
 });

@@ -39,8 +39,10 @@ Une application web simple et épurée permettant à deux utilisateurs de commun
    ```
 
 4. **Ouvrir l'application**
-   - Rendez-vous sur `http://localhost:3000`
-   - Ouvrez l'URL dans **deux onglets ou navigateurs différents** pour tester
+   - **Local** : `http://localhost:3000`
+   - **Réseau WiFi** : Le serveur affichera automatiquement les IP disponibles
+   - **Accès externe** : Voir le guide [Configuration Réseau](network-setup.md)
+   - Ouvrez l'URL dans **deux onglets ou appareils différents** pour tester
 
 ## 🎯 Utilisation
 
@@ -52,8 +54,20 @@ Une application web simple et épurée permettant à deux utilisateurs de commun
 
 ## 🔧 Configuration
 
+### Scripts disponibles
+```bash
+npm start        # Accès réseau (0.0.0.0:3000)
+npm run local    # Accès local uniquement (localhost:3000)
+npm run network  # Accès réseau explicite (0.0.0.0:3000)
+npm run public   # Accès public (0.0.0.0:8080)
+npm run dev      # Développement avec auto-reload
+```
+
+### Accès réseau externe
+Pour accéder depuis la 5G/4G ou d'autres réseaux, consultez le guide détaillé : [Configuration Réseau](network-setup.md)
+
 ### Port du serveur
-Le serveur écoute par défaut sur le port `3000`. Vous pouvez le modifier en définissant la variable d'environnement `PORT` :
+Le serveur écoute par défaut sur le port `3000`. Vous pouvez le modifier :
 
 ```bash
 PORT=8080 npm start
