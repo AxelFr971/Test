@@ -107,7 +107,15 @@ class VoiceChatApp {
     }
 
     async initializeAudio() {
+        // Vérifier le contexte de sécurité
+        this.checkSecurityContext();
+        
         try {
+            // Vérifier si getUserMedia est disponible
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('getUserMedia non supporté par ce navigateur');
+            }
+
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
                     echoCancellation: true,
@@ -122,10 +130,91 @@ class VoiceChatApp {
             console.log('Audio initialisé avec succès');
             this.addSystemMessage('Microphone activé avec succès');
             
+            // Arrêter le stream initial pour économiser les ressources
+            stream.getTracks().forEach(track => track.stop());
+            
         } catch (error) {
             console.error('Erreur d\'accès au microphone:', error);
-            this.addSystemMessage('Erreur d\'accès au microphone. Veuillez autoriser l\'accès.', 'error');
-            this.recordBtn.disabled = true;
+            this.handleAudioError(error);
+        }
+    }
+
+    checkSecurityContext() {
+        const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        
+        if (!isSecure) {
+            console.warn('⚠️ Contexte non-sécurisé détecté');
+            this.addSystemMessage('⚠️ Accès microphone limité sur HTTP. Utilisez HTTPS pour un accès complet.', 'warning');
+        }
+
+        console.log('🔒 Contexte de sécurité:', {
+            protocol: location.protocol,
+            hostname: location.hostname,
+            isSecure: isSecure
+        });
+    }
+
+    handleAudioError(error) {
+        let message = 'Erreur d\'accès au microphone.';
+        let solution = '';
+
+        switch (error.name) {
+            case 'NotAllowedError':
+            case 'PermissionDeniedError':
+                message = 'Accès au microphone refusé.';
+                solution = 'Cliquez sur l\'icône 🔒 dans la barre d\'adresse et autorisez le microphone.';
+                break;
+            case 'NotFoundError':
+            case 'DevicesNotFoundError':
+                message = 'Aucun microphone trouvé.';
+                solution = 'Vérifiez qu\'un microphone est connecté.';
+                break;
+            case 'NotReadableError':
+            case 'TrackStartError':
+                message = 'Microphone utilisé par une autre application.';
+                solution = 'Fermez les autres applications utilisant le microphone.';
+                break;
+            case 'NotSupportedError':
+                message = 'Microphone non supporté.';
+                solution = 'Essayez avec un autre navigateur ou appareil.';
+                break;
+            default:
+                if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+                    message = 'Microphone bloqué sur HTTP.';
+                    solution = 'Utilisez HTTPS ou ngrok pour l\'accès externe.';
+                }
+                break;
+        }
+
+        this.addSystemMessage(message, 'error');
+        if (solution) {
+            this.addSystemMessage('💡 Solution: ' + solution, 'info');
+        }
+        
+        this.recordBtn.disabled = true;
+        this.addSecurityWarning();
+    }
+
+    addSecurityWarning() {
+        if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'security-warning';
+            warningDiv.innerHTML = `
+                <div class="warning-content">
+                    <h3>🔒 HTTPS Requis</h3>
+                    <p>Pour utiliser le microphone sur un réseau externe, HTTPS est obligatoire.</p>
+                    <div class="warning-solutions">
+                        <h4>Solutions rapides:</h4>
+                        <ol>
+                            <li><strong>ngrok</strong>: <code>ngrok http 3000</code></li>
+                            <li><strong>Serveur local</strong>: Connectez-vous au même WiFi</li>
+                            <li><strong>Déployement HTTPS</strong>: Heroku, Netlify, etc.</li>
+                        </ol>
+                    </div>
+                </div>
+            `;
+            
+            this.messages.appendChild(warningDiv);
         }
     }
 

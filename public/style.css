@@ -258,6 +258,69 @@ footer {
     font-weight: 500;
 }
 
+/* Messages système */
+.message.system-message.error {
+    background: #ffe6e6;
+    border-left: 4px solid #ff6b6b;
+    color: #d63031;
+}
+
+.message.system-message.warning {
+    background: #fff8e1;
+    border-left: 4px solid #fdcb6e;
+    color: #e17055;
+}
+
+.message.system-message.info {
+    background: #e3f2fd;
+    border-left: 4px solid #667eea;
+    color: #2d3436;
+}
+
+/* Avertissement de sécurité */
+.security-warning {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 15px 0;
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+}
+
+.warning-content h3 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.warning-content p {
+    margin: 0 0 15px 0;
+    opacity: 0.9;
+}
+
+.warning-solutions h4 {
+    margin: 15px 0 10px 0;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.warning-solutions ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.warning-solutions li {
+    margin: 8px 0;
+    line-height: 1.4;
+}
+
+.warning-solutions code {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+}
+
 /* Animations */
 .fade-in {
     animation: fadeIn 0.3s ease-in;
