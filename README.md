@@ -5,19 +5,25 @@ Une application web simple et épurée permettant à deux utilisateurs de commun
 ## 🚀 Fonctionnalités
 
 - **Communication vocale en temps réel** entre deux utilisateurs
+- **Double transmission** : Socket.IO + WebRTC avec Xirsys
 - **Interface moderne et épurée** avec design responsive
 - **Enregistrement par maintien** du bouton (push-to-talk)
 - **Contrôle du volume** pour la réception audio
+- **Connectivité optimale** avec serveurs TURN/STUN Xirsys
+- **Fallback automatique** vers serveurs publics si nécessaire
 - **Indicateurs visuels** de statut de connexion et d'enregistrement
 - **Support mobile** avec gestes tactiles
 - **Messages système** pour guider l'utilisateur
+- **Configuration sécurisée** avec fichiers privés
 
 ## 🛠️ Technologies utilisées
 
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+)
 - **Backend**: Node.js, Express.js
-- **Communication temps réel**: Socket.IO
+- **Communication temps réel**: Socket.IO, WebRTC
 - **Audio**: Web Audio API, MediaRecorder API
+- **Connectivité**: Xirsys (serveurs TURN/STUN)
+- **Sécurité**: HTTPS, configuration privée
 
 ## 📦 Installation
 

@@ -6,11 +6,16 @@ class VoiceChatApp {
         this.audioChunks = [];
         this.isRecording = false;
         this.isConnected = false;
+        this.webrtcManager = null;
+        this.useWebRTC = false;
         
         this.initializeElements();
         this.setupEventListeners();
         this.setupSocketListeners();
         this.initializeAudio();
+        
+        // Exposer l'instance globalement pour WebRTC
+        window.voiceChatApp = this;
     }
 
     initializeElements() {
@@ -22,6 +27,7 @@ class VoiceChatApp {
         this.volumeSlider = document.getElementById('volume');
         this.volumeValue = document.getElementById('volume-value');
         this.messages = document.getElementById('messages');
+        this.webrtcBtn = document.getElementById('webrtc-btn');
     }
 
     setupEventListeners() {
@@ -62,6 +68,11 @@ class VoiceChatApp {
 
         // Empêcher la sélection du texte sur le bouton
         this.recordBtn.addEventListener('selectstart', (e) => e.preventDefault());
+
+        // Bouton WebRTC
+        this.webrtcBtn.addEventListener('click', () => {
+            this.startWebRTCCall();
+        });
     }
 
     setupSocketListeners() {
@@ -88,13 +99,24 @@ class VoiceChatApp {
             if (count >= 2) {
                 this.readyStatus.textContent = 'Prêt à discuter !';
                 this.addSystemMessage('Vous pouvez maintenant discuter avec votre correspondant');
+                
+                // Initialiser WebRTC quand 2 utilisateurs sont connectés
+                this.initializeWebRTC();
+                
+                // Afficher le bouton WebRTC
+                if (this.webrtcBtn) {
+                    this.webrtcBtn.style.display = 'flex';
+                }
             } else {
                 this.readyStatus.textContent = 'En attente d\'un autre utilisateur...';
             }
         });
 
         this.socket.on('audio-data', (audioData) => {
-            this.playReceivedAudio(audioData);
+            // Utiliser Socket.IO si WebRTC n'est pas connecté
+            if (!this.webrtcManager || !this.webrtcManager.isWebRTCConnected()) {
+                this.playReceivedAudio(audioData);
+            }
         });
 
         this.socket.on('user-speaking', (userId) => {
@@ -215,6 +237,50 @@ class VoiceChatApp {
             `;
             
             this.messages.appendChild(warningDiv);
+        }
+    }
+
+    initializeWebRTC() {
+        if (!this.webrtcManager && window.WebRTCManager) {
+            console.log('🌐 Initialisation WebRTC avec Xirsys...');
+            this.webrtcManager = new WebRTCManager(this.socket);
+            
+            // Configurer le callback pour l'audio distant
+            this.webrtcManager.onRemoteStream((stream) => {
+                console.log('🎵 Stream audio distant reçu via WebRTC');
+                this.playRemoteStream(stream);
+            });
+            
+            // Demander la configuration ICE
+            this.webrtcManager.requestIceConfig();
+            
+            this.addSystemMessage('WebRTC avec Xirsys initialisé');
+        }
+    }
+
+    async startWebRTCCall() {
+        if (this.webrtcManager) {
+            try {
+                await this.webrtcManager.startWebRTCCall();
+                this.useWebRTC = true;
+                this.addSystemMessage('Appel WebRTC démarré');
+            } catch (error) {
+                console.error('❌ Échec démarrage WebRTC:', error);
+                this.addSystemMessage('Échec WebRTC, utilisation Socket.IO', 'warning');
+            }
+        }
+    }
+
+    playRemoteStream(stream) {
+        try {
+            const audio = new Audio();
+            audio.srcObject = stream;
+            audio.volume = this.volumeSlider.value / 100;
+            audio.play();
+            
+            console.log('🔊 Lecture stream distant via WebRTC');
+        } catch (error) {
+            console.error('❌ Erreur lecture stream distant:', error);
         }
     }
 

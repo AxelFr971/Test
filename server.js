@@ -2,6 +2,17 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const XirsysService = require('./lib/xirsys');
+
+// Charger la configuration privée
+let xirsysService = null;
+try {
+  const secrets = require('./config/secrets');
+  xirsysService = new XirsysService(secrets.xirsys);
+  console.log('🔑 Configuration Xirsys chargée');
+} catch (error) {
+  console.warn('⚠️ Configuration Xirsys non trouvée, utilisation des serveurs STUN publics');
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +29,39 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Route principale
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Route pour obtenir la configuration ICE
+app.get('/api/ice-config', async (req, res) => {
+  try {
+    if (xirsysService) {
+      const config = await xirsysService.getIceConfigWithFallback();
+      res.json({
+        success: true,
+        config: config,
+        provider: 'xirsys'
+      });
+    } else {
+      // Configuration de fallback
+      res.json({
+        success: true,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ],
+          iceTransportPolicy: 'all'
+        },
+        provider: 'fallback'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Erreur récupération config ICE:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur serveur ICE'
+    });
+  }
 });
 
 // Gestion des connexions WebSocket
@@ -39,6 +83,59 @@ io.on('connection', (socket) => {
   socket.on('audio-data', (data) => {
     // Retransmettre les données audio à tous les autres clients
     socket.broadcast.emit('audio-data', data);
+  });
+
+  // Gérer les offres/réponses WebRTC
+  socket.on('webrtc-offer', (data) => {
+    socket.broadcast.emit('webrtc-offer', {
+      offer: data.offer,
+      senderId: socket.id
+    });
+  });
+
+  socket.on('webrtc-answer', (data) => {
+    socket.broadcast.emit('webrtc-answer', {
+      answer: data.answer,
+      senderId: socket.id
+    });
+  });
+
+  socket.on('webrtc-ice-candidate', (data) => {
+    socket.broadcast.emit('webrtc-ice-candidate', {
+      candidate: data.candidate,
+      senderId: socket.id
+    });
+  });
+
+  // Demande de configuration ICE
+  socket.on('request-ice-config', async () => {
+    try {
+      if (xirsysService) {
+        const config = await xirsysService.getIceConfigWithFallback(socket.id);
+        socket.emit('ice-config', {
+          success: true,
+          config: config,
+          provider: 'xirsys'
+        });
+      } else {
+        socket.emit('ice-config', {
+          success: true,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ],
+            iceTransportPolicy: 'all'
+          },
+          provider: 'fallback'
+        });
+      }
+    } catch (error) {
+      socket.emit('ice-config', {
+        success: false,
+        error: 'Erreur serveur ICE'
+      });
+    }
   });
 
   // Gérer l'état de préparation de l'utilisateur
