@@ -12,7 +12,9 @@
     "https": "HTTPS=true node server-https.js",
     "https-dev": "HTTPS=true nodemon server-https.js",
     "generate-certs": "node generate-certs.js",
-    "setup-https": "npm run generate-certs && npm run https"
+    "setup-https": "npm run generate-certs && npm run https",
+    "configure-xirsys": "node scripts/configure-xirsys.js",
+    "test-xirsys": "node -e \"const XirsysService = require('./lib/xirsys'); const secrets = require('./config/secrets'); const xirsys = new XirsysService(secrets.xirsys); xirsys.testConnection().then(result => console.log('Test Xirsys:', result ? '✅ OK' : '❌ Échec'));\""
   },
   "dependencies": {
     "express": "^4.18.2",
