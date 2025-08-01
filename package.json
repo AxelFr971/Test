@@ -1,0 +1,29 @@
+{
+  "name": "voice-chat-app",
+  "version": "1.0.0",
+  "description": "Application de chat vocal simple pour deux utilisateurs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "local": "HOST=localhost PORT=3000 node server.js",
+    "network": "HOST=0.0.0.0 PORT=3000 node server.js",
+    "public": "HOST=0.0.0.0 PORT=8080 node server.js",
+    "https": "HTTPS=true node server-https.js",
+    "https-dev": "HTTPS=true nodemon server-https.js",
+    "generate-certs": "node generate-certs.js",
+    "setup-https": "npm run generate-certs && npm run https",
+    "configure-xirsys": "node scripts/configure-xirsys.js",
+    "test-xirsys": "node -e \"const XirsysService = require('./lib/xirsys'); const secrets = require('./config/secrets'); const xirsys = new XirsysService(secrets.xirsys); xirsys.testConnection().then(result => console.log('Test Xirsys:', result ? '✅ OK' : '❌ Échec'));\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["voice", "chat", "webrtc", "audio", "network"],
+  "author": "",
+  "license": "MIT"
+}
