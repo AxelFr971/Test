@@ -8,17 +8,26 @@ class VoiceChatApp {
         this.isConnected = false;
         this.webrtcManager = null;
         this.useWebRTC = false;
+        this.userPseudo = '';
+        this.stats = {
+            connectedUsers: 0,
+            waitingUsers: 0,
+            activeConversations: 0,
+            totalFeedbacks: 0
+        };
         
         this.initializeElements();
         this.setupEventListeners();
         this.setupSocketListeners();
         this.initializeAudio();
+        this.loadStats();
         
         // Exposer l'instance globalement pour WebRTC
         window.voiceChatApp = this;
     }
 
     initializeElements() {
+        // Éléments existants
         this.recordBtn = document.getElementById('record-btn');
         this.connectionStatus = document.getElementById('connection-status');
         this.usersCount = document.getElementById('users-count');
@@ -28,6 +37,26 @@ class VoiceChatApp {
         this.volumeValue = document.getElementById('volume-value');
         this.messages = document.getElementById('messages');
         this.webrtcBtn = document.getElementById('webrtc-btn');
+        this.nextUserBtn = document.getElementById('next-user-btn');
+        
+        // Nouveaux éléments pour Vocaline
+        this.pseudoSection = document.getElementById('pseudo-section');
+        this.pseudoInput = document.getElementById('pseudo-input');
+        this.pseudoBtn = document.getElementById('pseudo-btn');
+        this.statsSection = document.getElementById('stats-section');
+        this.chatArea = document.getElementById('chat-area');
+        this.feedbackSection = document.getElementById('feedback-section');
+        
+        // Éléments de statistiques
+        this.connectedUsersEl = document.getElementById('connected-users');
+        this.waitingUsersEl = document.getElementById('waiting-users');
+        this.activeConversationsEl = document.getElementById('active-conversations');
+        this.totalFeedbacksEl = document.getElementById('total-feedbacks');
+        
+        // Éléments de feedback
+        this.feedbackBtn = document.getElementById('feedback-btn');
+        this.feedbackComment = document.getElementById('feedback-comment');
+        this.ratingInputs = document.querySelectorAll('input[name="rating"]');
         
         // Variables pour matchmaking
         this.currentPartner = null;
@@ -36,6 +65,14 @@ class VoiceChatApp {
     }
 
     setupEventListeners() {
+        // Gestion du pseudo
+        this.pseudoBtn.addEventListener('click', () => this.setPseudo());
+        this.pseudoInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.setPseudo();
+            }
+        });
+
         // Bouton d'enregistrement - maintenir appuyé
         this.recordBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -82,6 +119,93 @@ class VoiceChatApp {
                 this.startWebRTCCall();
             }
         });
+
+        // Bouton utilisateur suivant
+        if (this.nextUserBtn) {
+            this.nextUserBtn.addEventListener('click', () => this.nextUser());
+        }
+
+        // Gestion du feedback
+        this.feedbackBtn.addEventListener('click', () => this.submitFeedback());
+    }
+
+    setPseudo() {
+        const pseudo = this.pseudoInput.value.trim();
+        if (pseudo.length < 2) {
+            alert('Le pseudo doit contenir au moins 2 caractères');
+            return;
+        }
+        
+        this.userPseudo = pseudo;
+        this.socket.emit('update-pseudo', pseudo);
+        
+        // Masquer la section pseudo et afficher le chat
+        this.pseudoSection.style.display = 'none';
+        this.chatArea.style.display = 'flex';
+        
+        this.addMessage('Système', `Pseudo défini: ${pseudo}`, 'system');
+        this.readyStatus.textContent = 'Prêt pour le matchmaking';
+    }
+
+    async submitFeedback() {
+        const rating = document.querySelector('input[name="rating"]:checked');
+        if (!rating) {
+            alert('Veuillez sélectionner une note');
+            return;
+        }
+
+        const comment = this.feedbackComment.value.trim();
+        
+        try {
+            const response = await fetch('/api/feedbacks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    rating: parseInt(rating.value),
+                    comment: comment,
+                    pseudo: this.userPseudo || 'Anonyme'
+                })
+            });
+
+            if (response.ok) {
+                alert('Merci pour votre feedback !');
+                this.feedbackComment.value = '';
+                rating.checked = false;
+                this.loadStats(); // Recharger les statistiques
+            } else {
+                alert('Erreur lors de l\'envoi du feedback');
+            }
+        } catch (error) {
+            console.error('Erreur feedback:', error);
+            alert('Erreur lors de l\'envoi du feedback');
+        }
+    }
+
+    async loadStats() {
+        try {
+            const response = await fetch('/api/stats');
+            const stats = await response.json();
+            
+            this.stats = {
+                connectedUsers: stats.totalUsers || 0,
+                waitingUsers: stats.usersInQueue || 0,
+                activeConversations: stats.activeConversations || 0,
+                totalFeedbacks: stats.feedbacks?.total || 0
+            };
+            
+            this.updateStatsDisplay();
+        } catch (error) {
+            console.error('Erreur chargement stats:', error);
+        }
+    }
+
+    updateStatsDisplay() {
+        if (this.connectedUsersEl) this.connectedUsersEl.textContent = this.stats.connectedUsers;
+        if (this.waitingUsersEl) this.waitingUsersEl.textContent = this.stats.waitingUsers;
+        if (this.activeConversationsEl) this.activeConversationsEl.textContent = this.stats.activeConversations;
+        if (this.totalFeedbacksEl) this.totalFeedbacksEl.textContent = this.stats.totalFeedbacks;
     }
 
     setupSocketListeners() {
@@ -100,450 +224,244 @@ class VoiceChatApp {
             this.connectionStatus.textContent = 'Déconnecté';
             this.connectionStatus.className = 'status-offline';
             this.recordBtn.disabled = true;
+            this.readyStatus.textContent = 'Déconnecté';
         });
 
-        // État du matchmaking
+        this.socket.on('matchmaking-stats', (stats) => {
+            this.stats = {
+                connectedUsers: stats.totalUsers || 0,
+                waitingUsers: stats.usersInQueue || 0,
+                activeConversations: stats.activeConversations || 0,
+                totalFeedbacks: stats.feedbacks?.total || 0
+            };
+            this.updateStatsDisplay();
+            this.usersCount.textContent = `${stats.totalUsers || 0} utilisateur(s) connecté(s)`;
+        });
+
         this.socket.on('matchmaking-state', (state) => {
             this.userState = state;
-            this.updateMatchmakingUI();
+            this.updateMatchmakingState(state);
         });
 
-        // Statistiques du matchmaking
-        this.socket.on('matchmaking-stats', (stats) => {
-            this.updateStats(stats);
-        });
-
-        // Match trouvé
         this.socket.on('match-found', (data) => {
-            console.log('🎯 Match trouvé avec:', data.partner.id);
             this.currentPartner = data.partner;
             this.isInConversation = true;
             
-            this.addSystemMessage('🎉 Partenaire trouvé ! WebRTC activé automatiquement');
-            this.recordBtn.disabled = false;
+            const partnerName = data.partner.pseudo || 'Utilisateur';
+            this.addMessage('Système', `🎯 Match trouvé avec ${partnerName} !`, 'system');
+            this.readyStatus.textContent = `En conversation avec ${partnerName}`;
             
-            if (this.webrtcBtn) {
-                this.webrtcBtn.style.display = 'none'; // WebRTC auto
+            // Afficher le bouton "Utilisateur suivant"
+            if (this.nextUserBtn) {
+                this.nextUserBtn.style.display = 'flex';
             }
-
-            // Démarrer automatiquement WebRTC
-            setTimeout(() => {
-                this.initializeAndStartWebRTC();
-            }, 1000);
+            
+            // Initialiser WebRTC si disponible
+            if (window.webrtcManager) {
+                window.webrtcManager.initializeConnection(data.partner.id);
+            }
         });
 
-        // Match terminé
         this.socket.on('match-ended', (data) => {
-            console.log('💔 Match terminé:', data.reason);
+            this.currentPartner = null;
+            this.isInConversation = false;
             
-            let message = 'Conversation terminée';
+            let reason = 'Conversation terminée';
             switch (data.reason) {
                 case 'partner_left':
-                    message = 'Votre partenaire a quitté';
+                    reason = 'L\'autre utilisateur a quitté';
                     break;
                 case 'partner_next':
-                    message = 'Votre partenaire passe au suivant';
+                    reason = 'L\'autre utilisateur a changé';
+                    break;
+                case 'user_left':
+                    reason = 'Vous avez quitté';
                     break;
             }
             
-            this.addSystemMessage(message, 'warning');
-            this.resetConversation();
-        });
-
-        this.socket.on('audio-data', (audioData) => {
-            // Utiliser Socket.IO si WebRTC n'est pas connecté
-            if (!this.webrtcManager || !this.webrtcManager.isWebRTCConnected()) {
-                this.playReceivedAudio(audioData);
+            this.addMessage('Système', reason, 'system');
+            this.readyStatus.textContent = 'En attente de match...';
+            
+            // Masquer le bouton "Utilisateur suivant"
+            if (this.nextUserBtn) {
+                this.nextUserBtn.style.display = 'none';
+            }
+            
+            // Fermer la connexion WebRTC
+            if (window.webrtcManager) {
+                window.webrtcManager.closeConnection();
             }
         });
 
         this.socket.on('user-speaking', (userId) => {
-            this.addSystemMessage('Votre correspondant parle...');
+            this.addMessage('Système', '🎤 L\'autre utilisateur parle...', 'system');
         });
 
         this.socket.on('user-stopped-speaking', (userId) => {
-            // Message optionnel quand l'autre utilisateur arrête de parler
+            this.addMessage('Système', '🔇 L\'autre utilisateur a arrêté de parler', 'system');
+        });
+
+        this.socket.on('partner-webrtc-ready', (data) => {
+            if (window.webrtcManager) {
+                window.webrtcManager.onPartnerReady(data.partnerId);
+            }
+        });
+
+        // Événements WebRTC
+        this.socket.on('webrtc-offer', (data) => {
+            if (window.webrtcManager) {
+                window.webrtcManager.handleOffer(data.offer, data.senderId);
+            }
+        });
+
+        this.socket.on('webrtc-answer', (data) => {
+            if (window.webrtcManager) {
+                window.webrtcManager.handleAnswer(data.answer, data.senderId);
+            }
+        });
+
+        this.socket.on('webrtc-ice-candidate', (data) => {
+            if (window.webrtcManager) {
+                window.webrtcManager.handleIceCandidate(data.candidate, data.senderId);
+            }
+        });
+
+        this.socket.on('ice-config', (data) => {
+            if (data.success && window.webrtcManager) {
+                window.webrtcManager.setIceConfig(data.config);
+            }
         });
     }
 
-    async initializeAudio() {
-        // Vérifier le contexte de sécurité
-        this.checkSecurityContext();
+    updateMatchmakingState(state) {
+        if (!state) return;
         
-        try {
-            // Vérifier si getUserMedia est disponible
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error('getUserMedia non supporté par ce navigateur');
-            }
-
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    sampleRate: 44100
-                } 
-            });
-            
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            this.microphone = this.audioContext.createMediaStreamSource(stream);
-            
-            console.log('Audio initialisé avec succès');
-            this.addSystemMessage('Microphone activé avec succès');
-            
-            // Arrêter le stream initial pour économiser les ressources
-            stream.getTracks().forEach(track => track.stop());
-            
-        } catch (error) {
-            console.error('Erreur d\'accès au microphone:', error);
-            this.handleAudioError(error);
-        }
-    }
-
-    checkSecurityContext() {
-        const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        
-        if (!isSecure) {
-            console.warn('⚠️ Contexte non-sécurisé détecté');
-            this.addSystemMessage('⚠️ Accès microphone limité sur HTTP. Utilisez HTTPS pour un accès complet.', 'warning');
-        }
-
-        console.log('🔒 Contexte de sécurité:', {
-            protocol: location.protocol,
-            hostname: location.hostname,
-            isSecure: isSecure
-        });
-    }
-
-    handleAudioError(error) {
-        let message = 'Erreur d\'accès au microphone.';
-        let solution = '';
-
-        switch (error.name) {
-            case 'NotAllowedError':
-            case 'PermissionDeniedError':
-                message = 'Accès au microphone refusé.';
-                solution = 'Cliquez sur l\'icône 🔒 dans la barre d\'adresse et autorisez le microphone.';
+        switch (state.user.status) {
+            case 'available':
+                this.readyStatus.textContent = 'En attente de match...';
                 break;
-            case 'NotFoundError':
-            case 'DevicesNotFoundError':
-                message = 'Aucun microphone trouvé.';
-                solution = 'Vérifiez qu\'un microphone est connecté.';
+            case 'in_queue':
+                this.readyStatus.textContent = 'En file d\'attente...';
                 break;
-            case 'NotReadableError':
-            case 'TrackStartError':
-                message = 'Microphone utilisé par une autre application.';
-                solution = 'Fermez les autres applications utilisant le microphone.';
+            case 'in_conversation':
+                this.readyStatus.textContent = 'En conversation...';
+                this.isInConversation = true;
                 break;
-            case 'NotSupportedError':
-                message = 'Microphone non supporté.';
-                solution = 'Essayez avec un autre navigateur ou appareil.';
-                break;
-            default:
-                if (location.protocol === 'http:' && location.hostname !== 'localhost') {
-                    message = 'Microphone bloqué sur HTTP.';
-                    solution = 'Utilisez HTTPS ou ngrok pour l\'accès externe.';
-                }
-                break;
-        }
-
-        this.addSystemMessage(message, 'error');
-        if (solution) {
-            this.addSystemMessage('💡 Solution: ' + solution, 'info');
-        }
-        
-        this.recordBtn.disabled = true;
-        this.addSecurityWarning();
-    }
-
-    addSecurityWarning() {
-        if (location.protocol === 'http:' && location.hostname !== 'localhost') {
-            const warningDiv = document.createElement('div');
-            warningDiv.className = 'security-warning';
-            warningDiv.innerHTML = `
-                <div class="warning-content">
-                    <h3>🔒 HTTPS Requis</h3>
-                    <p>Pour utiliser le microphone sur un réseau externe, HTTPS est obligatoire.</p>
-                    <div class="warning-solutions">
-                        <h4>Solutions rapides:</h4>
-                        <ol>
-                            <li><strong>ngrok</strong>: <code>ngrok http 3000</code></li>
-                            <li><strong>Serveur local</strong>: Connectez-vous au même WiFi</li>
-                            <li><strong>Déployement HTTPS</strong>: Heroku, Netlify, etc.</li>
-                        </ol>
-                    </div>
-                </div>
-            `;
-            
-            this.messages.appendChild(warningDiv);
-        }
-    }
-
-    initializeWebRTC() {
-        if (!this.webrtcManager && window.WebRTCManager) {
-            console.log('🌐 Initialisation WebRTC avec Xirsys...');
-            this.webrtcManager = new WebRTCManager(this.socket);
-            
-            // Configurer le callback pour l'audio distant
-            this.webrtcManager.onRemoteStream((stream) => {
-                console.log('🎵 Stream audio distant reçu via WebRTC');
-                this.playRemoteStream(stream);
-            });
-            
-            // Demander la configuration ICE
-            this.webrtcManager.requestIceConfig();
-            
-            this.addSystemMessage('WebRTC avec Xirsys initialisé');
-        }
-    }
-
-    async initializeAndStartWebRTC() {
-        this.initializeWebRTC();
-        if (this.webrtcManager) {
-            try {
-                await this.webrtcManager.startWebRTCCall();
-                this.addSystemMessage('🌐 WebRTC activé automatiquement');
-            } catch (error) {
-                console.error('❌ Échec WebRTC automatique:', error);
-                this.addSystemMessage('WebRTC indisponible, utilisation Socket.IO', 'warning');
-            }
         }
     }
 
     nextUser() {
         if (!this.isInConversation) return;
         
-        console.log('🔄 Demande utilisateur suivant');
-        this.addSystemMessage('Recherche d\'un nouveau partenaire...', 'info');
-        
-        // Nettoyer WebRTC
-        if (this.webrtcManager) {
-            this.webrtcManager.disconnect();
-            this.webrtcManager = null;
-        }
-        
-        // Envoyer la demande au serveur
         this.socket.emit('next-user');
-        
-        this.resetConversation();
+        this.addMessage('Système', '🔄 Demande de changement d\'utilisateur...', 'system');
     }
 
-    resetConversation() {
-        this.isInConversation = false;
-        this.currentPartner = null;
-        this.recordBtn.disabled = true;
+    startWebRTCCall() {
+        this.addMessage('Système', '🌐 Initialisation WebRTC...', 'system');
+        this.socket.emit('request-ice-config');
+    }
+
+    startRecording() {
+        if (!this.isConnected || this.isRecording) return;
         
-        if (this.webrtcBtn) {
-            this.webrtcBtn.innerHTML = '<span class="webrtc-icon">🔄</span><span>Recherche...</span>';
-            this.webrtcBtn.disabled = true;
+        this.isRecording = true;
+        this.recordBtn.classList.add('recording');
+        this.recordingIndicator.classList.add('show');
+        
+        if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
+            this.mediaRecorder.start();
+        }
+        
+        this.socket.emit('start-recording');
+    }
+
+    stopRecording() {
+        if (!this.isRecording) return;
+        
+        this.isRecording = false;
+        this.recordBtn.classList.remove('recording');
+        this.recordingIndicator.classList.remove('show');
+        
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+        }
+        
+        this.socket.emit('stop-recording');
+    }
+
+    addMessage(sender, text, type = 'message') {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        
+        const timestamp = new Date().toLocaleTimeString('fr-FR', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <span class="message-sender">${sender}</span>
+                <span class="message-time">${timestamp}</span>
+            </div>
+            <div class="message-content">${text}</div>
+        `;
+        
+        this.messages.appendChild(messageDiv);
+        this.messages.scrollTop = this.messages.scrollHeight;
+    }
+
+    updateVolume(volume) {
+        if (this.audioContext) {
+            this.audioContext.gain.gain.value = volume;
         }
     }
 
-    updateMatchmakingUI() {
-        if (!this.userState) return;
-        
-        const user = this.userState.user;
-        const stats = this.userState.stats;
-        const queuePos = this.userState.queuePosition;
-        
-        // Mise à jour du statut
-        switch (user.status) {
-            case 'available':
-                this.readyStatus.textContent = 'Recherche d\'un partenaire...';
-                break;
-            case 'in_queue':
-                this.readyStatus.textContent = `En file d'attente (position ${queuePos})`;
-                break;
-            case 'in_conversation':
-                this.readyStatus.textContent = 'En conversation';
-                if (this.webrtcBtn) {
-                    this.webrtcBtn.innerHTML = '<span class="webrtc-icon">⏭️</span><span>Utilisateur suivant</span>';
-                    this.webrtcBtn.disabled = false;
-                    this.webrtcBtn.style.display = 'flex';
-                }
-                break;
-        }
-        
-        // Mise à jour des statistiques
-        this.updateStats(stats);
-    }
-
-    updateStats(stats) {
-        if (this.usersCount) {
-            this.usersCount.textContent = 
-                `${stats.totalUsers} en ligne • ${stats.activeConversations} conversations • ${stats.usersInQueue} en attente`;
-        }
-    }
-
-    async startWebRTCCall() {
-        if (this.webrtcManager) {
-            try {
-                await this.webrtcManager.startWebRTCCall();
-                this.useWebRTC = true;
-                this.addSystemMessage('Appel WebRTC démarré');
-            } catch (error) {
-                console.error('❌ Échec démarrage WebRTC:', error);
-                this.addSystemMessage('Échec WebRTC, utilisation Socket.IO', 'warning');
-            }
-        }
-    }
-
-    playRemoteStream(stream) {
-        try {
-            const audio = new Audio();
-            audio.srcObject = stream;
-            audio.volume = this.volumeSlider.value / 100;
-            audio.play();
-            
-            console.log('🔊 Lecture stream distant via WebRTC');
-        } catch (error) {
-            console.error('❌ Erreur lecture stream distant:', error);
-        }
-    }
-
-    async startRecording() {
-        if (!this.isConnected || this.isRecording || !this.isInConversation) return;
-
+    async initializeAudio() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    sampleRate: 44100
+                    autoGainControl: true
                 } 
             });
-
+            
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = this.audioContext.createMediaStreamSource(stream);
+            const gain = this.audioContext.createGain();
+            
+            source.connect(gain);
+            gain.connect(this.audioContext.destination);
+            
+            this.audioContext.gain = gain;
+            this.updateVolume(this.volumeSlider.value / 100);
+            
             this.mediaRecorder = new MediaRecorder(stream, {
                 mimeType: 'audio/webm;codecs=opus'
             });
-
-            this.audioChunks = [];
-            this.isRecording = true;
-
+            
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
-                    this.audioChunks.push(event.data);
+                    this.socket.emit('audio-data', {
+                        audio: event.data,
+                        timestamp: Date.now()
+                    });
                 }
             };
-
-            this.mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm;codecs=opus' });
-                this.sendAudioData(audioBlob);
-                
-                // Arrêter toutes les pistes audio
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            this.mediaRecorder.start(100); // Envoyer des données toutes les 100ms
             
-            // Mise à jour de l'interface
-            this.recordBtn.style.background = 'linear-gradient(135deg, #ff6b6b, #ee5a52)';
-            this.recordBtn.querySelector('.button-text').textContent = 'Enregistrement...';
-            this.recordingIndicator.classList.add('active');
-            
-            // Signaler aux autres utilisateurs
-            this.socket.emit('start-recording');
+            this.recordBtn.disabled = false;
+            this.addMessage('Système', '🎤 Microphone activé', 'system');
             
         } catch (error) {
-            console.error('Erreur lors du démarrage de l\'enregistrement:', error);
-            this.addSystemMessage('Erreur lors de l\'enregistrement', 'error');
-        }
-    }
-
-    stopRecording() {
-        if (!this.isRecording || !this.mediaRecorder) return;
-
-        this.isRecording = false;
-        this.mediaRecorder.stop();
-
-        // Restaurer l'interface
-        this.recordBtn.style.background = 'linear-gradient(135deg, #51cf66, #40c057)';
-        this.recordBtn.querySelector('.button-text').textContent = 'Maintenir pour parler';
-        this.recordingIndicator.classList.remove('active');
-        
-        // Signaler aux autres utilisateurs
-        this.socket.emit('stop-recording');
-    }
-
-    async sendAudioData(audioBlob) {
-        try {
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-            
-            this.socket.emit('audio-data', {
-                audio: base64Audio,
-                type: audioBlob.type
-            });
-            
-        } catch (error) {
-            console.error('Erreur lors de l\'envoi de l\'audio:', error);
-        }
-    }
-
-    async playReceivedAudio(audioData) {
-        try {
-            const binaryString = atob(audioData.audio);
-            const bytes = new Uint8Array(binaryString.length);
-            
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            
-            const audioBlob = new Blob([bytes], { type: audioData.type });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            
-            const audio = new Audio(audioUrl);
-            audio.volume = this.volumeSlider.value / 100;
-            
-            await audio.play();
-            
-            // Nettoyer l'URL après la lecture
-            audio.addEventListener('ended', () => {
-                URL.revokeObjectURL(audioUrl);
-            });
-            
-        } catch (error) {
-            console.error('Erreur lors de la lecture de l\'audio:', error);
-        }
-    }
-
-    updateVolume(volume) {
-        // Cette fonction peut être utilisée pour ajuster le volume des audios reçus
-        document.querySelectorAll('audio').forEach(audio => {
-            audio.volume = volume;
-        });
-    }
-
-    addSystemMessage(message, type = 'info') {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message system-message ${type}`;
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                <span class="message-text">${message}</span>
-                <span class="message-time">${new Date().toLocaleTimeString()}</span>
-            </div>
-        `;
-        
-        // Retirer le message de bienvenue s'il existe
-        const welcomeMessage = this.messages.querySelector('.welcome-message');
-        if (welcomeMessage) {
-            welcomeMessage.style.display = 'none';
-        }
-        
-        this.messages.appendChild(messageDiv);
-        messageDiv.classList.add('fade-in');
-        
-        // Faire défiler vers le bas
-        this.messages.scrollTop = this.messages.scrollHeight;
-        
-        // Retirer les anciens messages système (garder seulement les 5 derniers)
-        const systemMessages = this.messages.querySelectorAll('.system-message');
-        if (systemMessages.length > 5) {
-            systemMessages[0].remove();
+            console.error('Erreur accès microphone:', error);
+            this.addMessage('Système', '❌ Erreur accès microphone', 'error');
+            this.recordBtn.disabled = true;
         }
     }
 }
 
-// Démarrer l'application quand la page est chargée
+// Initialiser l'application quand le DOM est chargé
 document.addEventListener('DOMContentLoaded', () => {
     new VoiceChatApp();
 });

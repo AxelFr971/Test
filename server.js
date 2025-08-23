@@ -4,6 +4,8 @@ const socketIo = require('socket.io');
 const path = require('path');
 const XirsysService = require('./lib/xirsys');
 const MatchmakingSystem = require('./lib/matchmaking');
+const LoggingSystem = require('./lib/logging');
+const FeedbackSystem = require('./lib/feedback');
 
 // Charger la configuration privée
 let xirsysService = null;
@@ -15,9 +17,14 @@ try {
   console.warn('⚠️ Configuration Xirsys non trouvée, utilisation des serveurs STUN publics');
 }
 
-// Initialiser le système de matchmaking
+// Initialiser les systèmes
 const matchmaking = new MatchmakingSystem();
+const logging = new LoggingSystem();
+const feedback = new FeedbackSystem();
+
 console.log('🎯 Système de matchmaking initialisé');
+console.log('📝 Système de logs initialisé');
+console.log('💬 Système de feedback initialisé');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,12 +35,67 @@ const io = socketIo(server, {
   }
 });
 
-// Servir les fichiers statiques
+// Middleware pour parser le JSON
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Route principale
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Route pour les logs d'administration
+app.get('/logs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'logs.html'));
+});
+
+// Route pour les feedbacks d'administration
+app.get('/feedbacks', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'feedbacks.html'));
+});
+
+// API pour obtenir les logs
+app.get('/api/logs', (req, res) => {
+  const { type, limit = 100, offset = 0 } = req.query;
+  const logs = logging.getLogs({ type, limit: parseInt(limit), offset: parseInt(offset) });
+  res.json(logs);
+});
+
+// API pour supprimer des logs
+app.delete('/api/logs/:id', (req, res) => {
+  const success = logging.deleteLog(req.params.id);
+  res.json({ success });
+});
+
+// API pour exporter les logs en CSV
+app.get('/api/logs/export', (req, res) => {
+  const { type } = req.query;
+  const csv = logging.exportToCSV(type);
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=logs.csv');
+  res.send(csv);
+});
+
+// API pour obtenir les feedbacks
+app.get('/api/feedbacks', (req, res) => {
+  const { limit = 50, offset = 0 } = req.query;
+  const feedbacks = feedback.getFeedbacks({ limit: parseInt(limit), offset: parseInt(offset) });
+  res.json(feedbacks);
+});
+
+// API pour ajouter un feedback
+app.post('/api/feedbacks', (req, res) => {
+  const { rating, comment, pseudo } = req.body;
+  const newFeedback = feedback.addFeedback({ rating, comment, pseudo });
+  res.json(newFeedback);
+});
+
+// API pour exporter les feedbacks en CSV
+app.get('/api/feedbacks/export', (req, res) => {
+  const csv = feedback.exportToCSV();
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=feedbacks.csv');
+  res.send(csv);
 });
 
 // Route pour obtenir la configuration ICE
@@ -71,7 +133,14 @@ app.get('/api/ice-config', async (req, res) => {
 // Route pour les statistiques de matchmaking
 app.get('/api/stats', (req, res) => {
   const stats = matchmaking.getStats();
-  res.json(stats);
+  const logStats = logging.getStats();
+  const feedbackStats = feedback.getStats();
+  
+  res.json({
+    ...stats,
+    logs: logStats,
+    feedbacks: feedbackStats
+  });
 });
 
 // Fonctions utilitaires
@@ -92,6 +161,13 @@ function notifyMatch(user1Id, user2Id, conversation) {
     state: user2State
   });
   
+  // Logger le match
+  logging.addLog('match_created', {
+    user1: user1State.user.pseudo || user1Id,
+    user2: user2State.user.pseudo || user2Id,
+    conversationId: conversation.id
+  });
+  
   console.log(`🎯 Match créé: ${user1Id} ↔ ${user2Id}`);
 }
 
@@ -102,17 +178,36 @@ function notifyMatchEnd(userId, reason) {
       reason: reason,
       state: userState
     });
+    
+    // Logger la fin de conversation
+    if (userState.user.conversationId) {
+      logging.addLog('conversation_ended', {
+        userId: userState.user.pseudo || userId,
+        reason: reason,
+        conversationId: userState.user.conversationId
+      });
+    }
   }
 }
 
 function broadcastStats() {
   const stats = matchmaking.getStats();
-  io.emit('matchmaking-stats', stats);
+  const logStats = logging.getStats();
+  const feedbackStats = feedback.getStats();
+  
+  io.emit('matchmaking-stats', {
+    ...stats,
+    logs: logStats,
+    feedbacks: feedbackStats
+  });
 }
 
 // Gestion des connexions WebSocket
 io.on('connection', (socket) => {
   console.log('Nouvel utilisateur connecté:', socket.id);
+  
+  // Logger la connexion
+  logging.addLog('user_connected', { socketId: socket.id });
   
   // Ajouter l'utilisateur au système de matchmaking
   const user = matchmaking.addUser(socket.id, socket.id);
@@ -132,6 +227,18 @@ io.on('connection', (socket) => {
   
   // Informer tous les clients des statistiques
   broadcastStats();
+
+  // Mettre à jour le pseudo de l'utilisateur
+  socket.on('update-pseudo', (pseudo) => {
+    const userState = matchmaking.getUserState(socket.id);
+    if (userState) {
+      userState.user.pseudo = pseudo;
+      logging.addLog('pseudo_updated', { 
+        socketId: socket.id, 
+        pseudo: pseudo 
+      });
+    }
+  });
 
   // Gérer les données audio (uniquement entre partenaires)
   socket.on('audio-data', (data) => {
@@ -207,6 +314,8 @@ io.on('connection', (socket) => {
   socket.on('next-user', () => {
     console.log(`🔄 ${socket.id} demande l'utilisateur suivant`);
     
+    logging.addLog('next_user_requested', { socketId: socket.id });
+    
     const currentPartner = matchmaking.getPartner(socket.id);
     if (currentPartner) {
       // Notifier le partenaire que la conversation se termine
@@ -259,6 +368,8 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('Utilisateur déconnecté:', socket.id);
     
+    logging.addLog('user_disconnected', { socketId: socket.id });
+    
     const partner = matchmaking.getPartner(socket.id);
     if (partner) {
       // Notifier le partenaire que l'utilisateur a quitté
@@ -277,8 +388,10 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(`🚀 Serveur de matchmaking démarré sur ${HOST}:${PORT}`);
+  console.log(`🚀 Serveur Vocaline démarré sur ${HOST}:${PORT}`);
   console.log(`📱 Accès local: http://localhost:${PORT}`);
+  console.log(`📊 Logs: http://localhost:${PORT}/logs`);
+  console.log(`💬 Feedbacks: http://localhost:${PORT}/feedbacks`);
   
   // Afficher les adresses IP disponibles
   const networkInterfaces = require('os').networkInterfaces();
@@ -292,9 +405,10 @@ server.listen(PORT, HOST, () => {
     });
   });
   
-  console.log('\n🎯 Système de matchmaking:');
-  console.log('   • Connexions 1-on-1 automatiques');
-  console.log('   • WebRTC activé par défaut');
-  console.log('   • File d\'attente intégrée');
-  console.log('   • Fonction "utilisateur suivant"');
+  console.log('\n🎯 Vocaline - Plateforme de communication vocale:');
+  console.log('   • Matchmaking audio 1-on-1 automatique');
+  console.log('   • WebRTC pour communication P2P');
+  console.log('   • Système de logs en temps réel');
+  console.log('   • Collecte de feedbacks utilisateurs');
+  console.log('   • Interface d\'administration complète');
 });

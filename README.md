@@ -1,158 +1,215 @@
-# 💬 Chat Vocal Simple
+# 🚛 Vocaline
 
-Une application web simple et épurée permettant à deux utilisateurs de communiquer par la voix en temps réel.
+**Plateforme web permettant aux chauffeurs routiers de se mettre en relation par la voix en 1-to-1 via leur navigateur.**
 
-## 🚀 Fonctionnalités
+Vocaline est une application de communication vocale en temps réel conçue spécifiquement pour les chauffeurs routiers. Elle permet une mise en relation automatique entre utilisateurs connectés via WebRTC pour des conversations vocales de qualité.
 
-- **Communication vocale en temps réel** entre deux utilisateurs
-- **Double transmission** : Socket.IO + WebRTC avec Xirsys
-- **Interface moderne et épurée** avec design responsive
-- **Enregistrement par maintien** du bouton (push-to-talk)
-- **Contrôle du volume** pour la réception audio
-- **Connectivité optimale** avec serveurs TURN/STUN Xirsys
-- **Fallback automatique** vers serveurs publics si nécessaire
-- **Indicateurs visuels** de statut de connexion et d'enregistrement
-- **Support mobile** avec gestes tactiles
-- **Messages système** pour guider l'utilisateur
-- **Configuration sécurisée** avec fichiers privés
+## ✨ Fonctionnalités Principales
 
-## 🛠️ Technologies utilisées
+### 🎯 Matchmaking Audio
+- **Connexions automatiques 1-on-1** : Mise en relation instantanée entre deux utilisateurs
+- **WebRTC P2P** : Communication audio directe entre utilisateurs sans passer par le serveur
+- **File d'attente intelligente** : Gestion automatique des utilisateurs en attente
 
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Backend**: Node.js, Express.js
-- **Communication temps réel**: Socket.IO, WebRTC
-- **Audio**: Web Audio API, MediaRecorder API
-- **Connectivité**: Xirsys (serveurs TURN/STUN)
-- **Sécurité**: HTTPS, configuration privée
+### 🔄 Changement d'Utilisateur
+- **Bouton "Utilisateur suivant"** : Permet de quitter la conversation actuelle et d'entrer immédiatement dans une nouvelle mise en relation
+- **Transition fluide** : Changement instantané sans déconnexion
 
-## 📦 Installation
+### 🚪 Déconnexion Simple
+- **Fermeture d'onglet** : L'utilisateur peut quitter la plateforme en fermant l'onglet
+- **Bouton "Quitter"** : Déconnexion propre avec notification au partenaire
 
-1. **Cloner le projet** (ou utiliser les fichiers existants)
+### 📊 Logs en Temps Réel
+- **Interface d'administration** : Accès via `/logs` avec filtres par type
+- **Export CSV** : Exportation des données de logs
+- **Copie et suppression** : Gestion complète des logs
+- **Métriques** : Total logs, types d'événements, connexions, matchs réussis
 
-2. **Installer les dépendances**
-   ```bash
-   npm install
-   ```
+### 💬 Feedback Utilisateurs
+- **Formulaire simple** : Collecte d'avis avec notation (1-5 étoiles) et commentaires
+- **Interface d'administration** : Accès via `/feedbacks` avec options de copie et export CSV
+- **Statistiques** : Note moyenne, répartition des notes, activité récente
 
-3. **Démarrer le serveur**
-   ```bash
-   npm start
-   ```
-   
-   Ou pour le développement avec auto-reload :
-   ```bash
-   npm run dev
-   ```
+### 📈 Statistiques Temps Réel
+- **Page d'accueil** : Affichage du nombre d'utilisateurs connectés, en attente, et de conversations actives
+- **Mise à jour automatique** : Actualisation toutes les 30 secondes
+- **Métriques clés** : Utilisateurs connectés, en file d'attente, conversations actives, total feedbacks
 
-4. **Ouvrir l'application**
-   - **Local** : `http://localhost:3000`
-   - **Réseau WiFi** : Le serveur affichera automatiquement les IP disponibles
-   - **Accès externe** : Voir le guide [Configuration Réseau](network-setup.md)
-   - Ouvrez l'URL dans **deux onglets ou appareils différents** pour tester
+## 🛠️ Installation et Démarrage
 
-## 🎯 Utilisation
+### Prérequis
+- Node.js (version 14 ou supérieure)
+- npm ou yarn
+- Navigateur moderne avec support WebRTC
 
-1. **Autoriser l'accès au microphone** lorsque demandé par le navigateur
-2. **Attendre qu'un deuxième utilisateur se connecte**
-3. **Maintenir le bouton "Maintenir pour parler"** pour enregistrer votre voix
-4. **Relâcher le bouton** pour envoyer l'audio à votre correspondant
-5. **Ajuster le volume** avec le curseur si nécessaire
+### Installation
+```bash
+# Cloner le repository
+git clone <repository-url>
+cd vocaline
+
+# Installer les dépendances
+npm install
+
+# Démarrer l'application
+npm start
+```
+
+### Scripts Disponibles
+```bash
+# Démarrage en mode développement
+npm run dev
+
+# Démarrage local uniquement
+npm run local
+
+# Démarrage sur le réseau
+npm run network
+
+# Démarrage avec HTTPS
+npm run https
+
+# Configuration HTTPS
+npm run setup-https
+```
+
+## 🌐 Accès à l'Application
+
+- **Interface principale** : `http://localhost:3000`
+- **Logs d'administration** : `http://localhost:3000/logs`
+- **Feedbacks d'administration** : `http://localhost:3000/feedbacks`
 
 ## 🔧 Configuration
 
-### Scripts disponibles
-```bash
-npm start        # Accès réseau (0.0.0.0:3000)
-npm run local    # Accès local uniquement (localhost:3000)
-npm run network  # Accès réseau explicite (0.0.0.0:3000)
-npm run public   # Accès public (0.0.0.0:8080)
-npm run dev      # Développement avec auto-reload
-```
+### Configuration Xirsys (Optionnel)
+Pour une meilleure connectivité WebRTC, vous pouvez configurer Xirsys :
 
-### Accès réseau externe
-Pour accéder depuis la 5G/4G ou d'autres réseaux, consultez le guide détaillé : [Configuration Réseau](network-setup.md)
-
-### Port du serveur
-Le serveur écoute par défaut sur le port `3000`. Vous pouvez le modifier :
-
-```bash
-PORT=8080 npm start
-```
-
-### Qualité audio
-Les paramètres audio peuvent être ajustés dans `public/app.js` :
-
+1. Créer un compte sur [Xirsys](https://xirsys.com)
+2. Créer un fichier `config/secrets.js` :
 ```javascript
-audio: {
-    echoCancellation: true,    // Suppression d'écho
-    noiseSuppression: true,    // Suppression du bruit
-    sampleRate: 44100         // Fréquence d'échantillonnage
-}
+module.exports = {
+  xirsys: {
+    ident: 'votre-ident',
+    secret: 'votre-secret',
+    domain: 'votre-domaine',
+    application: 'vocaline',
+    room: 'default',
+    secure: 1
+  }
+};
 ```
 
-## 🌐 Compatibilité
+3. Tester la configuration :
+```bash
+npm run test-xirsys
+```
 
-- **Navigateurs modernes** supportant WebRTC et MediaRecorder API
-- **Chrome/Chromium** : Support complet
-- **Firefox** : Support complet
-- **Safari** : Support partiel (iOS 14.3+)
-- **Edge** : Support complet
+### Configuration HTTPS
+Pour un accès externe sécurisé :
+
+```bash
+# Générer les certificats
+npm run generate-certs
+
+# Démarrer avec HTTPS
+npm run https
+```
+
+## 📱 Utilisation
+
+### Pour les Utilisateurs
+1. **Accéder à l'application** via le navigateur
+2. **Entrer un pseudo** (minimum 2 caractères)
+3. **Autoriser l'accès au microphone** quand demandé
+4. **Attendre la mise en relation** automatique
+5. **Maintenir le bouton** pour parler
+6. **Utiliser "Utilisateur suivant"** pour changer de partenaire
+7. **Soumettre un feedback** pour partager son avis
+
+### Pour les Administrateurs
+1. **Accéder aux logs** : `/logs`
+   - Visualiser l'activité en temps réel
+   - Filtrer par type d'événement
+   - Exporter en CSV
+   - Supprimer des logs
+
+2. **Accéder aux feedbacks** : `/feedbacks`
+   - Consulter les avis utilisateurs
+   - Voir les statistiques de notation
+   - Exporter les données
+   - Gérer les feedbacks
 
 ## 🔒 Sécurité
 
-- L'application nécessite **HTTPS en production** pour accéder au microphone
-- Aucune donnée audio n'est stockée sur le serveur
-- Communication directe entre clients via WebSocket
+- **HTTPS requis** pour l'accès externe au microphone
+- **WebRTC P2P** : Les conversations audio ne passent pas par le serveur
+- **Pas de stockage persistant** : Données en mémoire uniquement
+- **Validation des entrées** : Protection contre les injections
 
-## 📱 Support mobile
+## 📊 Métriques de Succès
 
-L'application est entièrement responsive et fonctionne sur mobile avec :
-- Gestes tactiles pour l'enregistrement
-- Interface adaptée aux petits écrans
-- Support des navigateurs mobiles modernes
+L'application mesure automatiquement :
+- **Nombre de connexions** utilisateurs
+- **Nombre de matchs réussis**
+- **Durée moyenne des conversations**
+- **Nombre de feedbacks reçus**
+- **Types d'événements** (connexions, déconnexions, matchs, etc.)
+
+## 🚀 Déploiement
+
+### Déploiement Local
+```bash
+npm start
+```
+
+### Déploiement avec PM2
+```bash
+npm install -g pm2
+pm2 start server.js --name vocaline
+pm2 startup
+pm2 save
+```
+
+### Variables d'Environnement
+- `PORT` : Port du serveur (défaut: 3000)
+- `HOST` : Adresse d'écoute (défaut: 0.0.0.0)
+- `HTTPS` : Activer HTTPS (true/false)
 
 ## 🐛 Dépannage
 
-### Erreur d'accès au microphone
-- Vérifiez que vous avez autorisé l'accès au microphone
-- En production, utilisez HTTPS
-- Rechargez la page et réessayez
+### Problèmes de Microphone
+- Vérifier les permissions du navigateur
+- Utiliser HTTPS pour l'accès externe
+- Vérifier qu'aucune autre application n'utilise le microphone
 
-### Pas de son reçu
-- Vérifiez que les deux utilisateurs sont connectés
-- Testez le volume avec le curseur
-- Vérifiez la console pour les erreurs
+### Problèmes de Connexion WebRTC
+- Vérifier la configuration Xirsys
+- Utiliser les serveurs STUN publics en fallback
+- Vérifier les pare-feu et NAT
 
-### Problèmes de connexion
-- Vérifiez que le serveur est démarré
-- Regardez les logs du serveur pour les erreurs
-- Testez dans un autre navigateur
+### Problèmes de Performance
+- Limiter le nombre de logs en mémoire (configurable)
+- Nettoyer régulièrement les anciens logs
+- Surveiller l'utilisation mémoire
 
-## 🔄 Structure du projet
+## 📝 Licence
 
-```
-voice-chat-app/
-├── package.json          # Configuration npm
-├── server.js             # Serveur Node.js/Socket.IO
-├── README.md             # Documentation
-└── public/               # Fichiers client
-    ├── index.html        # Page principale
-    ├── style.css         # Styles CSS
-    └── app.js            # Application JavaScript
-```
+MIT License - Voir le fichier LICENSE pour plus de détails.
 
-## 🎨 Personnalisation
+## 🤝 Contribution
 
-### Couleurs
-Les couleurs peuvent être modifiées dans `public/style.css` en changeant les variables CSS dans les gradients et couleurs principales.
+Les contributions sont les bienvenues ! N'hésitez pas à :
+- Signaler des bugs
+- Proposer des améliorations
+- Soumettre des pull requests
 
-### Messages
-Les messages système peuvent être personnalisés dans la méthode `addSystemMessage()` de `public/app.js`.
+## 📞 Support
 
-## 📄 Licence
-
-MIT License - Libre d'utilisation et de modification.
+Pour toute question ou problème :
+- Ouvrir une issue sur GitHub
+- Consulter la documentation technique
+- Vérifier les logs d'administration
 
 ---
 
-**Note importante** : Cette application est conçue pour un usage local ou intranet. Pour un déploiement en production, considérez l'ajout de fonctionnalités de sécurité supplémentaires et l'optimisation pour la scalabilité.
+**Vocaline** - Communication vocale pour chauffeurs routiers 🚛
