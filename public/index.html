@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Vocal Simple</title>
+    <title>Vocaline - Communication Vocale pour Chauffeurs</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>💬 Chat Vocal</h1>
+            <h1>🚛 Vocaline</h1>
+            <p class="subtitle">Communication vocale pour chauffeurs routiers</p>
             <div class="status">
                 <span id="connection-status" class="status-offline">Déconnecté</span>
                 <span id="users-count">0 utilisateur(s) connecté(s)</span>
@@ -18,14 +19,47 @@
         </header>
 
         <main>
-            <div class="chat-area">
+            <!-- Section Pseudo -->
+            <div class="pseudo-section" id="pseudo-section">
+                <h3>👤 Votre pseudo</h3>
+                <div class="pseudo-input">
+                    <input type="text" id="pseudo-input" placeholder="Entrez votre pseudo" maxlength="20">
+                    <button id="pseudo-btn" class="primary-button">Valider</button>
+                </div>
+            </div>
+
+            <!-- Section Statistiques -->
+            <div class="stats-section" id="stats-section">
+                <h3>📊 Statistiques en temps réel</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="connected-users">0</div>
+                        <div class="stat-label">Connectés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="waiting-users">0</div>
+                        <div class="stat-label">En attente</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="active-conversations">0</div>
+                        <div class="stat-label">Conversations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-feedbacks">0</div>
+                        <div class="stat-label">Feedbacks</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section Matchmaking -->
+            <div class="chat-area" id="chat-area" style="display: none;">
                 <div id="messages" class="messages">
                     <div class="welcome-message">
                         <h2>🎯 Matchmaking Vocal</h2>
                         <p>Connexions automatiques 1-on-1 avec WebRTC</p>
                         <ul style="text-align: left; margin: 15px 0;">
                             <li>🎯 Matchmaking automatique</li>
-                            <li>🌐 WebRTC activé par défaut</li>
+                            <li>🌐 WebRTC pour communication P2P</li>
                             <li>⏭️ Bouton "Utilisateur suivant"</li>
                             <li>⏳ File d'attente intelligente</li>
                         </ul>
@@ -45,6 +79,10 @@
                         <span class="webrtc-icon">🔄</span>
                         <span>Recherche...</span>
                     </button>
+                    <button id="next-user-btn" class="next-user-button" style="display:none;">
+                        <span class="next-icon">⏭️</span>
+                        <span>Utilisateur suivant</span>
+                    </button>
                 </div>
 
                 <div class="volume-indicator">
@@ -53,11 +91,39 @@
                     <span id="volume-value">80%</span>
                 </div>
             </div>
+
+            <!-- Section Feedback -->
+            <div class="feedback-section" id="feedback-section">
+                <h3>💬 Votre avis compte</h3>
+                <div class="feedback-form">
+                    <div class="rating-input">
+                        <label>Note:</label>
+                        <div class="stars">
+                            <input type="radio" name="rating" value="5" id="star5">
+                            <label for="star5">⭐</label>
+                            <input type="radio" name="rating" value="4" id="star4">
+                            <label for="star4">⭐</label>
+                            <input type="radio" name="rating" value="3" id="star3">
+                            <label for="star3">⭐</label>
+                            <input type="radio" name="rating" value="2" id="star2">
+                            <label for="star2">⭐</label>
+                            <input type="radio" name="rating" value="1" id="star1">
+                            <label for="star1">⭐</label>
+                        </div>
+                    </div>
+                    <textarea id="feedback-comment" placeholder="Votre commentaire (optionnel)" maxlength="1000"></textarea>
+                    <button id="feedback-btn" class="primary-button">Envoyer</button>
+                </div>
+            </div>
         </main>
 
         <footer>
             <div class="info">
                 <span id="ready-status">En attente...</span>
+            </div>
+            <div class="admin-links">
+                <a href="/logs" target="_blank" class="admin-link">📊 Logs</a>
+                <a href="/feedbacks" target="_blank" class="admin-link">💬 Feedbacks</a>
             </div>
         </footer>
     </div>

@@ -1,7 +1,7 @@
 {
-  "name": "voice-chat-app",
+  "name": "vocaline",
   "version": "1.0.0",
-  "description": "Application de chat vocal simple pour deux utilisateurs",
+  "description": "Plateforme web permettant aux chauffeurs routiers de se mettre en relation par la voix en 1-to-1 via leur navigateur",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -23,7 +23,7 @@
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["voice", "chat", "webrtc", "audio", "network"],
-  "author": "",
+  "keywords": ["voice", "chat", "webrtc", "audio", "matchmaking", "drivers", "communication", "real-time"],
+  "author": "Vocaline Team",
   "license": "MIT"
 }
